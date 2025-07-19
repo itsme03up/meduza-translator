@@ -81,6 +81,22 @@ class MeduzaSummarizer:
             return article
 
 
+def summarize_article(text: str, sentences_count: int = 3) -> str:
+    """
+    テキストを要約する便利関数
+    
+    Args:
+        text: 要約するテキスト
+        sentences_count: 要約する文数
+        
+    Returns:
+        str: 要約されたテキスト
+    """
+    summarizer = MeduzaSummarizer()
+    summary = summarizer.summarize_text(text, max_length=sentences_count * 50)
+    return summary or "要約作成に失敗しました"
+
+
 def main():
     """テスト実行"""
     summarizer = MeduzaSummarizer()

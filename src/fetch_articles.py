@@ -70,6 +70,33 @@ class MeduzaFetcher:
             return None
 
 
+def fetch_meduza_articles(limit: int = 5) -> List[Dict]:
+    """
+    Meduzaから記事を取得する便利関数
+    
+    Args:
+        limit: 取得する記事数
+        
+    Returns:
+        List[Dict]: 記事データのリスト
+    """
+    fetcher = MeduzaFetcher()
+    articles = fetcher.fetch_rss_feed()
+    
+    if not articles:
+        return []
+    
+    # limit件に制限
+    limited_articles = articles[:limit]
+    
+    # 各記事の本文も取得
+    for article in limited_articles:
+        content = fetcher.fetch_article_content(article['link'])
+        article['content'] = content or "本文取得失敗"
+    
+    return limited_articles
+
+
 def main():
     """テスト実行"""
     fetcher = MeduzaFetcher()

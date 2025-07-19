@@ -77,7 +77,7 @@ class MeduzaTranslator:
             if article.get('title'):
                 translated_title = self.translate_text(article['title'])
                 if translated_title:
-                    translated_article['title_ja'] = translated_title
+                    translated_article['translated_title'] = translated_title
             
             # 要約を翻訳
             if article.get('summary'):
@@ -89,7 +89,7 @@ class MeduzaTranslator:
             if article.get('content'):
                 translated_content = self.translate_long_text(article['content'])
                 if translated_content:
-                    translated_article['content_ja'] = translated_content
+                    translated_article['translated_content'] = translated_content
                     
                     # 翻訳されたコンテンツの自動要約を生成
                     summarizer = MeduzaSummarizer()
