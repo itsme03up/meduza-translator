@@ -23,6 +23,30 @@ def init_session_state():
     if 'db_initialized' not in st.session_state:
         st.session_state.db_initialized = False
 
+def add_sample_data():
+    """サンプルデータを追加"""
+    sample_articles = [
+        {
+            'title': 'Привет, мир!',
+            'translated_title': 'こんにちは、世界！',
+            'content': 'Это тестовая статья для демонстрации работы приложения.',
+            'translated_content': 'これは、アプリケーションの動作を実演するためのテスト記事です。',
+            'summary': 'テストアプリケーションのデモンストレーション記事',
+            'published': '2025-07-19T16:00:00+03:00'
+        },
+        {
+            'title': 'Новости дня',
+            'translated_title': '今日のニュース',
+            'content': 'Сегодня произошло много интересных событий в мире.',
+            'translated_content': '今日、世界では多くの興味深い出来事が起こりました。',
+            'summary': '世界の興味深い出来事に関する日報',
+            'published': '2025-07-19T15:30:00+03:00'
+        }
+    ]
+    
+    for article in sample_articles:
+        save_article_to_session(article)
+
 def save_article_to_session(article):
     """記事をセッション状態に保存"""
     if 'articles' not in st.session_state:
@@ -288,12 +312,20 @@ with st.sidebar:
     )
     
     display_limit = st.selectbox("表示件数", [10, 20, 50, 100], index=1)
+    
+    # サンプルデータボタン（Streamlit Cloud用）
+    if USE_MEMORY_DB and st.button("📝 サンプルデータを追加", help="デモ用のサンプル記事を追加します"):
+        add_sample_data()
+        st.success("サンプルデータを追加しました！")
+        st.rerun()
 
 # メインコンテンツ
 articles = get_translated_articles(search_query, date_filter, display_limit)
 
 if not articles:
     st.warning("条件に一致する記事が見つかりません。")
+    if USE_MEMORY_DB:
+        st.info("💡 Streamlit Cloud版では「新着記事を取得・翻訳」または「サンプルデータを追加」ボタンで記事を追加してください。")
     st.info("💡 「新着記事を取得・翻訳」ボタンで記事を追加してください。")
 else:
     st.success(f"📊 {len(articles)}件の記事が見つかりました")
