@@ -61,13 +61,46 @@ class MeduzaFetcher:
         """
         try:
             logger.info(f"記事コンテンツを取得中: {url}")
-            # TODO: 記事ページのスクレイピング実装
-            # Beautiful Soupなどを使用して記事本文を抽出
-            return None
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Meduzaサイトの記事本文を抽出
+            # 一般的な記事セレクタを試す
+            content_selectors = [
+                'div.GeneralMaterial-article',
+                'div.RichText',
+                'div.SimpleBlock-article',
+                'article',
+                '.article-content',
+                '.post-content'
+            ]
+            
+            for selector in content_selectors:
+                content_div = soup.select_one(selector)
+                if content_div:
+                    # テキストのみ抽出、改行を保持
+                    paragraphs = content_div.find_all(['p', 'div', 'span'])
+                    content = '\n'.join([p.get_text().strip() for p in paragraphs if p.get_text().strip()])
+                    if content and len(content) > 100:  # 最小限の長さチェック
+                        return content
+            
+            # フォールバック: すべてのpタグを取得
+            paragraphs = soup.find_all('p')
+            content = '\n'.join([p.get_text().strip() for p in paragraphs if p.get_text().strip()])
+            
+            return content if content else "記事本文の抽出に失敗しました"
             
         except Exception as e:
             logger.error(f"記事取得エラー: {e}")
-            return None
+            return f"記事取得エラー: {str(e)}"
 
 
 def fetch_meduza_articles(limit: int = 5) -> List[Dict]:
