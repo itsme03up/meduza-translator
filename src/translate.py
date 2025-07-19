@@ -1,3 +1,5 @@
+# translate.py
+
 """
 翻訳処理（googletrans使用）
 ロシア語記事を日本語に翻訳する
