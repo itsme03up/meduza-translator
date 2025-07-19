@@ -9,7 +9,7 @@ def get_translated_articles():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT title_ja, summary_ja, content_ja, published 
+        SELECT translated_title, summary, translated_content, published 
         FROM articles 
         ORDER BY published DESC 
         LIMIT 10
