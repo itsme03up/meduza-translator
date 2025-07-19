@@ -5,70 +5,172 @@ from datetime import datetime, timedelta
 from src.fetch_articles import fetch_meduza_articles
 from src.translate import MeduzaTranslator
 from src.summarize import summarize_article
-from src.database import init_db, save_article_to_db
+import os
 
-DB_PATH = "data/articles.db"
+# Streamlit Cloud対応のデータベースパス設定
+if os.path.exists("/mount"):  # Streamlit Cloud環境
+    # メモリ内データベースを使用
+    DB_PATH = ":memory:"
+    USE_MEMORY_DB = True
+else:  # ローカル環境
+    DB_PATH = "data/articles.db"
+    USE_MEMORY_DB = False
+
+def init_session_state():
+    """セッション状態を初期化"""
+    if 'articles' not in st.session_state:
+        st.session_state.articles = []
+    if 'db_initialized' not in st.session_state:
+        st.session_state.db_initialized = False
+
+def save_article_to_session(article):
+    """記事をセッション状態に保存"""
+    if 'articles' not in st.session_state:
+        st.session_state.articles = []
+    
+    # 既存記事の重複チェック
+    existing_titles = [a.get('translated_title', '') for a in st.session_state.articles]
+    if article.get('translated_title', '') not in existing_titles:
+        st.session_state.articles.append(article)
 
 def get_translated_articles(search_query="", date_filter="all", limit=20):
     """翻訳済みの記事一覧を取得"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    if USE_MEMORY_DB:
+        # セッション状態から記事を取得
+        articles = st.session_state.get('articles', [])
+        
+        # フィルタリング
+        filtered_articles = []
+        for article in articles:
+            # 翻訳済みチェック
+            if not article.get('translated_title'):
+                continue
+                
+            # 検索クエリ
+            if search_query:
+                search_text = f"{article.get('translated_title', '')} {article.get('summary', '')} {article.get('translated_content', '')}".lower()
+                if search_query.lower() not in search_text:
+                    continue
+            
+            # 日付フィルター
+            if date_filter != "all":
+                published = article.get('published', '')
+                if published:
+                    try:
+                        # 日付解析（様々な形式に対応）
+                        from dateutil import parser
+                        pub_date = parser.parse(published).date()
+                        today = datetime.now().date()
+                        
+                        if date_filter == "today" and pub_date != today:
+                            continue
+                        elif date_filter == "week" and pub_date < (today - timedelta(days=7)):
+                            continue
+                        elif date_filter == "month" and pub_date < (today - timedelta(days=30)):
+                            continue
+                    except:
+                        continue
+            
+            filtered_articles.append((
+                article.get('translated_title', ''),
+                article.get('summary', ''),
+                article.get('translated_content', ''),
+                article.get('published', ''),
+                article.get('title', '')
+            ))
+        
+        # 日付でソート（新しい順）
+        filtered_articles.sort(key=lambda x: x[3], reverse=True)
+        return filtered_articles[:limit]
     
-    query = """
-        SELECT translated_title, summary, translated_content, published, title
-        FROM articles 
-        WHERE translated_title IS NOT NULL
-    """
-    params = []
-    
-    # 検索クエリ
-    if search_query:
-        query += " AND (translated_title LIKE ? OR summary LIKE ? OR translated_content LIKE ?)"
-        search_param = f"%{search_query}%"
-        params.extend([search_param, search_param, search_param])
-    
-    # 日付フィルター
-    if date_filter == "today":
-        today = datetime.now().strftime('%Y-%m-%d')
-        query += " AND date(published) = ?"
-        params.append(today)
-    elif date_filter == "week":
-        week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-        query += " AND date(published) >= ?"
-        params.append(week_ago)
-    elif date_filter == "month":
-        month_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        query += " AND date(published) >= ?"
-        params.append(month_ago)
-    
-    query += " ORDER BY published DESC LIMIT ?"
-    params.append(limit)
-    
-    cursor.execute(query, params)
-    articles = cursor.fetchall()
-    conn.close()
-    return articles
+    else:
+        # ローカル環境：SQLiteを使用
+        if not os.path.exists(DB_PATH):
+            return []
+            
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT translated_title, summary, translated_content, published, title
+            FROM articles 
+            WHERE translated_title IS NOT NULL
+        """
+        params = []
+        
+        # 検索クエリ
+        if search_query:
+            query += " AND (translated_title LIKE ? OR summary LIKE ? OR translated_content LIKE ?)"
+            search_param = f"%{search_query}%"
+            params.extend([search_param, search_param, search_param])
+        
+        # 日付フィルター
+        if date_filter == "today":
+            today = datetime.now().strftime('%Y-%m-%d')
+            query += " AND date(published) = ?"
+            params.append(today)
+        elif date_filter == "week":
+            week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            query += " AND date(published) >= ?"
+            params.append(week_ago)
+        elif date_filter == "month":
+            month_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+            query += " AND date(published) >= ?"
+            params.append(month_ago)
+        
+        query += " ORDER BY published DESC LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        articles = cursor.fetchall()
+        conn.close()
+        return articles
 
 def get_article_stats():
     """記事統計を取得"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    if USE_MEMORY_DB:
+        # セッション状態から統計を計算
+        articles = st.session_state.get('articles', [])
+        total_count = len(articles)
+        translated_count = len([a for a in articles if a.get('translated_title')])
+        
+        # 今日の記事数
+        today = datetime.now().date()
+        today_count = 0
+        for article in articles:
+            try:
+                from dateutil import parser
+                pub_date = parser.parse(article.get('published', '')).date()
+                if pub_date == today:
+                    today_count += 1
+            except:
+                continue
+                
+        return total_count, translated_count, today_count
     
-    # 総記事数
-    cursor.execute("SELECT COUNT(*) FROM articles")
-    total_count = cursor.fetchone()[0]
-    
-    # 翻訳済み記事数
-    cursor.execute("SELECT COUNT(*) FROM articles WHERE translated_title IS NOT NULL")
-    translated_count = cursor.fetchone()[0]
-    
-    # 今日の記事数
-    today = datetime.now().strftime('%Y-%m-%d')
-    cursor.execute("SELECT COUNT(*) FROM articles WHERE date(published) = ?", (today,))
-    today_count = cursor.fetchone()[0]
-    
-    conn.close()
-    return total_count, translated_count, today_count
+    else:
+        # ローカル環境：SQLiteを使用
+        if not os.path.exists(DB_PATH):
+            return 0, 0, 0
+            
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # 総記事数
+        cursor.execute("SELECT COUNT(*) FROM articles")
+        total_count = cursor.fetchone()[0]
+        
+        # 翻訳済み記事数
+        cursor.execute("SELECT COUNT(*) FROM articles WHERE translated_title IS NOT NULL")
+        translated_count = cursor.fetchone()[0]
+        
+        # 今日の記事数
+        today = datetime.now().strftime('%Y-%m-%d')
+        cursor.execute("SELECT COUNT(*) FROM articles WHERE date(published) = ?", (today,))
+        today_count = cursor.fetchone()[0]
+        
+        conn.close()
+        return total_count, translated_count, today_count
 
 def fetch_and_process_new_articles(num_articles=3):
     """新着記事を取得して処理する"""
@@ -76,8 +178,8 @@ def fetch_and_process_new_articles(num_articles=3):
     status_text = st.empty()
     
     try:
-        # データベース初期化
-        init_db()
+        # セッション状態初期化
+        init_session_state()
         
         # 記事取得
         status_text.text("📰 新着記事を取得中...")
@@ -110,7 +212,13 @@ def fetch_and_process_new_articles(num_articles=3):
             
             # 保存
             status_text.text(f"💾 記事 {i+1}/{len(articles)} を保存中...")
-            save_article_to_db(translated)
+            if USE_MEMORY_DB:
+                save_article_to_session(translated)
+            else:
+                # ローカル環境では従来通りデータベースに保存
+                from src.database import init_db, save_article_to_db
+                init_db()
+                save_article_to_db(translated)
             progress_bar.progress(int(progress))
         
         progress_bar.progress(100)
@@ -127,6 +235,9 @@ st.set_page_config(
     layout="wide",
     page_icon="📰"
 )
+
+# セッション状態を初期化
+init_session_state()
 
 st.title("📰 Meduza翻訳記事ビューア")
 st.markdown("---")
