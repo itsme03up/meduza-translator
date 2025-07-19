@@ -7,6 +7,7 @@
 
 from googletrans import Translator
 from typing import Optional, Dict
+from src.summarize import MeduzaSummarizer
 import logging
 import time
 
@@ -89,6 +90,12 @@ class MeduzaTranslator:
                 translated_content = self.translate_long_text(article['content'])
                 if translated_content:
                     translated_article['content_ja'] = translated_content
+                    
+                    # 翻訳されたコンテンツの自動要約を生成
+                    summarizer = MeduzaSummarizer()
+                    summary = summarizer.summarize_text(translated_content)
+                    if summary:
+                        translated_article["summary_auto"] = summary
             
             logger.info("記事翻訳完了")
             return translated_article
