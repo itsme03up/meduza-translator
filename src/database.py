@@ -1,6 +1,7 @@
 # src/database.py
 
 import sqlite3
+import os
 from datetime import datetime
 from typing import Optional, Dict
 
@@ -8,6 +9,7 @@ DB_PATH = "articles.db"
 
 def init_db():
     """初期テーブルを作成（初回のみ呼び出す）"""
+    os.makedirs("data", exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
