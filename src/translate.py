@@ -1,11 +1,11 @@
 # translate.py
 
 """
-翻訳処理（googletrans使用）
+翻訳処理（deep-translator使用）
 ロシア語記事を日本語に翻訳する
 """
 
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 from typing import Optional, Dict
 from src.summarize import MeduzaSummarizer
 import logging
@@ -20,11 +20,9 @@ class MeduzaTranslator:
     """Google Translateを使用した翻訳クラス"""
     
     def __init__(self):
-        self.translator = Translator()
-        self.source_lang = 'ru'  # ロシア語
-        self.target_lang = 'ja'  # 日本語
+        self.translator = GoogleTranslator(source='ru', target='ja')
     
-    def translate_text(self, text: str, delay: float = 1.0) -> Optional[str]:
+    def translate_text(self, text: str, delay: float = 0.5) -> Optional[str]:
         """
         テキストを翻訳
         
@@ -44,14 +42,12 @@ class MeduzaTranslator:
             # レート制限対策
             time.sleep(delay)
             
-            # 翻訳実行
-            result = self.translator.translate(
-                text, 
-                src=self.source_lang, 
-                dest=self.target_lang
-            )
+            # 翻訳実行（文字数制限: 5000文字）
+            if len(text) > 5000:
+                # 長いテキストは分割して翻訳
+                return self.translate_long_text(text)
             
-            translated_text = result.text
+            translated_text = self.translator.translate(text)
             logger.info(f"翻訳完了 (文字数: {len(translated_text)})")
             
             return translated_text
@@ -122,6 +118,19 @@ class MeduzaTranslator:
             # テキストを分割
             chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
             translated_chunks = []
+            
+            for i, chunk in enumerate(chunks, 1):
+                logger.info(f"チャンク {i}/{len(chunks)} を翻訳中...")
+                translated_chunk = self.translator.translate(chunk)
+                if translated_chunk:
+                    translated_chunks.append(translated_chunk)
+                time.sleep(0.5)  # レート制限対策
+            
+            return '\n'.join(translated_chunks)
+            
+        except Exception as e:
+            logger.error(f"長文翻訳エラー: {e}")
+            return None
             
             for i, chunk in enumerate(chunks):
                 logger.info(f"チャンク {i+1}/{len(chunks)} を翻訳中...")
