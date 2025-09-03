@@ -3,7 +3,7 @@
 ロシア語ニュースサイト「Медуза」から最新記事を取得し、日本語に翻訳・要約するStreamlitアプリです。
 
 ## 🚀 ライブデモ
-[Streamlit Cloud でアプリを見る](https://your-app-name.streamlit.app) (デプロイ後に更新)
+[Streamlit Cloud でアプリを見る](https://.streamlit.app) (デプロイ後に更新)
 
 ## ✨ 機能
 

@@ -52,10 +52,8 @@ class MeduzaFetcher:
     def fetch_article_content(self, url: str) -> Optional[str]:
         """
         指定URLから記事の詳細コンテンツを取得
-        
         Args:
             url (str): 記事のURL
-            
         Returns:
             Optional[str]: 記事コンテンツ
         """
